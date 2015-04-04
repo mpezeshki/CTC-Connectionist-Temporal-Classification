@@ -5,7 +5,7 @@ CTC-Connectionist Temporal Classification
 
 -Supports mini-batch.
 
--Supports both normal and log-scale.
+-Supports both normal- and log-scale.
 
 -"apple" problem (two same consecutive labels) is solved.
 
@@ -22,10 +22,12 @@ Graves, Alex, et al. "Connectionist temporal classification: labelling unsegment
 Credits
 =======
 Theano implementation of CTC by [Shawn Tan](https://github.com/shawntan/rnn-experiment/)
+
 Theano implementation of CTC by [Rakesh Var](https://github.com/rakeshvar/rnn_ctc)
 
 
 Special thanks to
 =================
 [Kyle Kastner](https://github.com/kastnerkyle)
+
 Pascal Lambdin
