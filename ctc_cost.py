@@ -1,9 +1,29 @@
+"""
+CTC-Connectionist Temporal Classification
+
+Code provided by Mohammad Pezeshki - May. 2015 -
+Montreal Institute for Learning Algorithms
+
+Referece: Graves, Alex, et al. "Connectionist temporal classification:
+labelling unsegmented sequence data with recurrent neural networks."
+Proceedings of the 23rd international conference on Machine learning.
+ACM, 2006.
+
+Credits: Shawn Tan, Rakesh Var
+
+This code is distributed without any warranty, express or implied.
+"""
+
 import theano
 from theano import tensor
 
 floatX = theano.config.floatX
 
 
+# T: INPUT_SEQUENCE_LENGTH
+# B: BATCH_SIZE
+# L: OUTPUT_SEQUENCE_LENGTH
+# C: NUM_CLASSES
 class CTC(object):
     """Connectionist Temporal Classification
     y_hat : T x B x C+1
@@ -88,10 +108,6 @@ class CTC(object):
 
     @classmethod
     def cost(cls, y, y_hat, y_mask, y_hat_mask, blank_symbol):
-        """
-        Based on code from Shawn Tan.
-        Credits to Kyle Kastner as well.
-        """
         y_hat_mask_len = tensor.sum(y_hat_mask, axis=0, dtype='int32')
         y_mask_len = tensor.sum(y_mask, axis=0, dtype='int32')
         probabilities, sth = cls.path_probabs(y, y_hat,
@@ -155,10 +171,6 @@ class CTC(object):
 
     @classmethod
     def log_cost(cls, y, y_hat, y_mask, y_hat_mask, blank_symbol):
-        """
-        Based on code from Shawn Tan.
-        Credits to Kyle Kastner as well.
-        """
         y_hat_mask_len = tensor.sum(y_hat_mask, axis=0, dtype='int32')
         y_mask_len = tensor.sum(y_mask, axis=0, dtype='int32')
         log_probabs = cls.log_path_probabs(y, y_hat,
