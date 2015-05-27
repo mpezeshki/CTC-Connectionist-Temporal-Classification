@@ -1,7 +1,7 @@
 """
 CTC-Connectionist Temporal Classification
 
-Code provided by Mohammad Pezeshki - May. 2015 -
+Code provided by "Mohammad Pezeshki" and "Philemon Brakel"- May. 2015 -
 Montreal Institute for Learning Algorithms
 
 Referece: Graves, Alex, et al. "Connectionist temporal classification:
