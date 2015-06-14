@@ -14,7 +14,10 @@ from blocks.main_loop import MainLoop
 from blocks.extensions import FinishAfter, Printing
 from blocks.bricks.recurrent import SimpleRecurrent
 from blocks.graph import ComputationGraph
-import cPickle as pickle
+try:
+    import cPickle as pickle
+except:
+    import pickle
 
 floatX = theano.config.floatX
 
@@ -35,14 +38,24 @@ h_dim = 9
 num_classes = 4
 
 with open("ctc_test_data.pkl", "rb") as pkl_file:
-    data = pickle.load(pkl_file)
-    inputs = data['inputs']
-    labels = data['labels']
-    # from S x T x B x D to S x T x B
-    inputs_mask = numpy.max(data['mask_inputs'], axis=-1)
-    labels_mask = data['mask_labels']
+    try:
+        data = pickle.load(pkl_file)
+        inputs = data['inputs']
+        labels = data['labels']
+        # from S x T x B x D to S x T x B
+        inputs_mask = numpy.max(data['mask_inputs'], axis=-1)
+        labels_mask = data['mask_labels']
+    except:
+        data = pickle.load(pkl_file, encoding='bytes')
+        inputs = data[b'inputs']
+        labels = data[b'labels']
+        # from S x T x B x D to S x T x B
+        inputs_mask = numpy.max(data[b'mask_inputs'], axis=-1)
+        labels_mask = data[b'mask_labels']
 
-print 'Building model ...'
+
+
+print('Building model ...')
 # T x B x F
 x = tensor.tensor3('x', dtype=floatX)
 # T x B
@@ -78,14 +91,14 @@ for brick in (rnn, x_to_h, h_to_o):
     brick.biases_init = Constant(0)
     brick.initialize()
 
-print 'Bulding DataStream ...'
+print('Bulding DataStream ...')
 dataset = IterableDataset({'x': inputs,
                            'x_mask': inputs_mask,
                            'y': labels,
                            'y_mask': labels_mask})
 stream = DataStream(dataset)
 
-print 'Bulding training process...'
+print('Bulding training process...')
 algorithm = GradientDescent(cost=cost,
                             params=ComputationGraph(cost).parameters,
                             step_rule=CompositeRule([StepClipping(10.0),
@@ -118,5 +131,5 @@ main_loop = MainLoop(data_stream=stream, algorithm=algorithm,
                                  Printing()],
                      model=model)
 
-print 'Starting training ...'
+print('Starting training ...')
 main_loop.run()
