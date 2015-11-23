@@ -66,8 +66,15 @@ def pseudo_cost(y, y_hat, y_mask, y_hat_mask, skip_softmax=False):
     Computes the marginal label probabilities and returns the
     cross entropy between this distribution and y_hat, ignoring the
     dependence of the two.
-    This cost should have the same gradient but hopefully theano will
-    use a more stable implementation of it.
+    This cost should have the same gradient but it should be more
+    numerically stable.
+
+    Here's how it works:
+
+    Say delta_y is the gradient we want theano to return with respect to
+    the input y and let's assume both variables are vectors. By simply
+    computing dot(delta_y, y), we obtain a cost with gradient delta_y.
+
     Parameters
     ----------
     y : matrix (L, B)
@@ -82,7 +89,7 @@ def pseudo_cost(y, y_hat, y_mask, y_hat_mask, skip_softmax=False):
         whether to interpret y_hat as probabilities or unnormalized energy
         values. The latter might be more numerically stable and efficient
         because it avoids the computation of the explicit cost and softmax
-        gradients.
+        gradients. You probably want to use this.
     """
     if skip_softmax:
         y_hat_softmax = (T.exp(y_hat - y_hat.max(2)[:, :, None]) /
@@ -112,6 +119,11 @@ def sequence_log_likelihood(y, y_hat, y_mask, y_hat_mask, blank_symbol,
     """
     Based on code from Shawn Tan.
     Credits to Kyle Kastner as well.
+
+    This function computes the CTC log likelihood for a sequence that has
+    been augmented with blank labels.
+
+    
     """
     y_hat_mask_len = tensor.sum(y_hat_mask, axis=0, dtype='int32')
     y_mask_len = tensor.sum(y_mask, axis=0, dtype='int32')
@@ -121,6 +133,9 @@ def sequence_log_likelihood(y, y_hat, y_mask, y_hat_mask, blank_symbol,
                                         y_mask, y_hat_mask,
                                         blank_symbol)
         batch_size = log_probabs.shape[1]
+
+        # Add the probabilities of the final time steps to get the total
+        # sequence likelihood.
         log_labels_probab = _log_add(
             log_probabs[y_hat_mask_len - 1,
                         tensor.arange(batch_size),
@@ -149,7 +164,9 @@ def cost(y, y_hat, y_mask, y_hat_mask, log_scale=True):
     Computes the CTC cost using just the forward computations.
     The difference between this function and the vanilla 'cost' function
     is that this function adds blanks first.
+
     Note: don't try to compute the gradient of this version of the cost!
+
     ----
     Parameters
     ----------
@@ -207,6 +224,10 @@ def _add_blanks(y, blank_symbol, y_mask=None):
 def _class_batch_to_labeling_batch(y, y_hat, y_hat_mask=None):
     """
     Convert (T, B, C) tensor into (T, B, L) tensor.
+
+    In other words, convert lattice of class probabilities into a lattice
+    of label probabilities costrained by the sequence y.
+
     Notes
     -----
     T: number of time steps
@@ -238,6 +259,14 @@ def _class_batch_to_labeling_batch(y, y_hat, y_hat_mask=None):
 def _recurrence_relation(y, y_mask, blank_symbol):
     """
     Construct a permutation matrix and tensor for computing CTC transitions.
+
+    This matrix is represented as an actual matrix that contains the
+    permutations that are common to all transitions in the batch and a tensor
+    with permutations that are uniqe for each individual sequence.
+
+    This 'matrix' is used to take the transition costraints into account
+    using just matrix algebra operations.
+
     Parameters
     ----------
     y : matrix (L, B)
@@ -270,6 +299,18 @@ def _recurrence_relation(y, y_mask, blank_symbol):
 
 
 def _path_probabs(y, y_hat, y_mask, y_hat_mask, blank_symbol):
+    """Compute the probabilities of the paths that are compatible with the
+    sequence y.
+
+    This function uses scan to get the forward probabilities (often denoted
+    with the symbol alpha in the literature).
+
+    See _log_path_probabs for a version that works in log domain.
+    """
+
+
+
+
     pred_y = _class_batch_to_labeling_batch(y, y_hat, y_hat_mask)
     pred_y = pred_y.dimshuffle(0, 2, 1)
     n_labels = y.shape[0]
@@ -318,6 +359,13 @@ def _log_path_probabs(y, log_y_hat, y_mask, y_hat_mask, blank_symbol,
                      reverse=False):
     """
     Uses dynamic programming to compute the path probabilities.
+
+    This function uses scan to get the forward probabilities (often denoted
+    with the symbol alpha in the literature).
+
+    This function computes the probabilities in log domain and can be used
+    both the forward and backward passes of the CTC algorithm.
+
     Notes
     -----
     T: number of time steps
@@ -362,6 +410,8 @@ def _log_path_probabs(y, log_y_hat, y_mask, y_hat_mask, blank_symbol,
     r2, r3 = T.log(r2), T.log(r3)
 
     def step(log_p_curr, y_hat_mask_t, log_p_prev):
+        # applies the transitions matrices to take the sequence constraints of y
+        # into account.
         p1 = log_p_prev
         p2 = _log_dot_matrix(p1, r2)
         p3 = _log_dot_tensor(p1, r3)
@@ -382,6 +432,8 @@ def _log_path_probabs(y, log_y_hat, y_mask, y_hat_mask, blank_symbol,
 
 
 def _log_forward_backward(y, log_y_hat, y_mask, y_hat_mask, blank_symbol):
+    """Simply calls _log_path_probabs in both directions."""
+
     log_probabs_forward = _log_path_probabs(y,
                                             log_y_hat,
                                             y_mask,
@@ -396,9 +448,11 @@ def _log_forward_backward(y, log_y_hat, y_mask, y_hat_mask, blank_symbol):
     return log_probabs_forward, log_probabs_backward[::-1][:, :, ::-1]
 
 
-def _labeling_batch_to_class_batch(y, y_labeling, num_classes,
-                                   y_hat_mask=None):
-    # FIXME: y_hat_mask is currently not used
+def _labeling_batch_to_class_batch(y, y_labeling, num_classes):
+    """Coverts a sequence label lattice into a lattice of scores/probabilities
+    for each class per input time step.
+    """
+
     batch_size = y.shape[1]
     N = y_labeling.shape[0]
     n_labels = y.shape[0]
